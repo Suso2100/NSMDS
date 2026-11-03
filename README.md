@@ -1,9 +1,8 @@
-# NSMDS
+#-NSMDS-#
 NSMDS (Not SteamModed) is an experimental mod loader and framework for Android builds of Balatro created using Balatro Mobile Maker.
 Require LÖVE portable and Balatro mobile maker
 
-
-#-INSTALATION-#
+#-INSTALLATION-#
 
 Step 1. Extract Balatro.exe from your game directory
 Step 2. Add the core folder in the same folder of main.lua
@@ -17,8 +16,10 @@ step 9. Enjoy
 
 
 #-USAGE-#
-Go to Data/com.unnoficial.balatro
+Go to Data/com.unofficial.balatro
 Search for the "mods" folder
 Put all the mods in that folder
 Restart Balatro
 Enjoy
+
+IS AN EXPERIMENTAL VERSION, THIS MAY CAUSE CRASHES AND BUGS
