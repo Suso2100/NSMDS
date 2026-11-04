@@ -161,6 +161,57 @@ local function inject_jokers(game)
     )
 end
 
+local function install_custom_joker_atlas_hook()
+    if not Card or not Card.set_sprites then
+        NSMDS.log("Card.set_sprites() not available.")
+        return
+    end
+
+    -- Evitar instalar el hook más de una vez
+    if GameHook.custom_atlas_hook_installed then
+        return
+    end
+
+    local original_set_sprites = Card.set_sprites
+
+    Card.set_sprites = function(self, center, front)
+        -- Ejecutar primero el comportamiento original
+        original_set_sprites(self, center, front)
+
+        -- Solo intervenir en Jokers
+        if not center or center.set ~= "Joker" then
+            return
+        end
+
+        -- Comprobar que el atlas personalizado existe
+        if not center.atlas or not G.ASSET_ATLAS[center.atlas] then
+            return
+        end
+
+        if not self.children or not self.children.center then
+            return
+        end
+
+        local sprite = self.children.center
+        local pos = center.pos
+        local bypass = self.params and self.params.bypass_discovery_center
+
+        -- Mantener los sprites de descubrimiento del juego
+        if not center.unlocked and not bypass then
+            pos = G.j_locked.pos
+        elseif not center.discovered and not bypass then
+            pos = G.j_undiscovered.pos
+        end
+
+        -- Aplicar el atlas y la posición personalizados
+        sprite.atlas = G.ASSET_ATLAS[center.atlas]
+        sprite:set_sprite_pos(pos)
+    end
+
+    GameHook.custom_atlas_hook_installed = true
+    NSMDS.log("Custom Joker atlas hook installed.")
+end
+
 function GameHook.install()
 
     if GameHook.installed then
@@ -188,6 +239,8 @@ function GameHook.install()
 
         return false
     end
+    
+    install_custom_joker_atlas_hook()
 
     -- Hook de las habilidades personalizadas
     local original_calculate_joker = Card.calculate_joker
