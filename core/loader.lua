@@ -9,6 +9,7 @@ local ModManager = require("core.mod_manager")
 local GameHook = require("core.game_hook")
 local UIHook = require("core.ui_hook")
 local json = require("core.json")
+local Atlas = require("core.atlas")
 
 NSMDS = NSMDS or {}
 
@@ -23,11 +24,12 @@ NSMDS.Failed = {}
 -- Internal registry
 NSMDS.Registry = {
     Mods = {},
-    Jokers = {}
+    Jokers = {},
+    Atlases = {}
 }
 
 NSMDS.CurrentMod = nil
-
+Atlas.initialize(NSMDS)
 --------------------------------------------------
 -- Logging
 --------------------------------------------------
@@ -76,6 +78,43 @@ function NSMDS.Mod(metadata)
 end
 
 --------------------------------------------------
+-- Registry helpers
+--------------------------------------------------
+
+local function create_pending_registry()
+    return {
+        Jokers = {},
+        Atlases = {}
+    }
+end
+
+local function commit_mod_registry(mod)
+
+    local pending = mod.pending_registry
+
+    if not pending then
+        return
+    end
+
+    -- Commit Jokers
+    for id, joker in pairs(pending.Jokers) do
+        NSMDS.Registry.Jokers[id] = joker
+    end
+
+    -- Commit Atlases
+    for id, atlas in pairs(pending.Atlases) do
+        NSMDS.Registry.Atlases[id] = atlas
+    end
+
+    mod.pending_registry = nil
+end
+
+local function discard_mod_registry(mod)
+
+    mod.pending_registry = nil
+end
+
+--------------------------------------------------
 -- Joker API
 --------------------------------------------------
 
@@ -98,9 +137,17 @@ function NSMDS.Joker(data)
     end
 
     local mod = NSMDS.CurrentMod
+
+    if not mod.pending_registry then
+        error("Mod registry is not initialized.")
+    end
+
     local joker_id = mod.metadata.id .. "_" .. data.key
 
-    if NSMDS.Registry.Jokers[joker_id] then
+    -- Check global and temporary registries
+    if NSMDS.Registry.Jokers[joker_id]
+        or mod.pending_registry.Jokers[joker_id] then
+
         error("Duplicate Joker key: " .. joker_id)
     end
 
@@ -123,7 +170,8 @@ function NSMDS.Joker(data)
         description = data.description or {}
     }
 
-    NSMDS.Registry.Jokers[joker_id] = joker
+    -- Store in the temporary registry
+    mod.pending_registry.Jokers[joker_id] = joker
 
     NSMDS.log(
         "Registered Joker: " .. joker.name ..
@@ -137,12 +185,23 @@ end
 -- Joker Registry API
 --------------------------------------------------
 
+
 function NSMDS.get_registered_jokers()
 
     local jokers = {}
 
+    -- Copy globally registered Jokers
     for id, joker in pairs(NSMDS.Registry.Jokers) do
         jokers[id] = joker
+    end
+
+    -- Include current mod's pending Jokers
+    if NSMDS.CurrentMod and NSMDS.CurrentMod.pending_registry then
+
+        for id, joker in pairs(NSMDS.CurrentMod.pending_registry.Jokers) do
+            jokers[id] = joker
+        end
+
     end
 
     return jokers
@@ -152,7 +211,7 @@ function NSMDS.get_joker_count()
 
     local count = 0
 
-    for _ in pairs(NSMDS.Registry.Jokers) do
+    for _ in pairs(NSMDS.get_registered_jokers()) do
         count = count + 1
     end
 
@@ -304,8 +363,6 @@ function NSMDS.discover_mods()
     return NSMDS.Mods
 end
 
-
-
 --------------------------------------------------
 -- Individual mod loading
 --------------------------------------------------
@@ -366,6 +423,9 @@ function NSMDS.load_mod(mod)
         return false
     end
 
+    -- Create temporary registry
+    mod.pending_registry = create_pending_registry()
+
     -- Set current mod context
     NSMDS.CurrentMod = mod
 
@@ -384,6 +444,9 @@ function NSMDS.load_mod(mod)
 
     if not success then
 
+        -- Discard all temporary registrations
+        discard_mod_registry(mod)
+
         mod.status = "failed"
         mod.error = result
 
@@ -393,6 +456,9 @@ function NSMDS.load_mod(mod)
 
         return false
     end
+
+    -- Commit temporary registrations
+    commit_mod_registry(mod)
 
     -- Register successfully loaded mod
     NSMDS.Registry.Mods[mod.metadata.id] = mod
@@ -427,7 +493,6 @@ function NSMDS.load_mods()
     if not NSMDS.initialize_directory() then
         return false
     end
-    
 
     NSMDS.discover_mods()
 
