@@ -2,7 +2,7 @@
 --[[
     NSMDS - Not SteamModed
     Core / Loader
-    Version: 0.2.0
+    Version: 0.4.0
 ]]
 
 local ModManager = require("core.mod_manager")
@@ -93,6 +93,10 @@ function NSMDS.Joker(data)
         error("Joker requires a valid key.")
     end
 
+    if data.calculate ~= nil and type(data.calculate) ~= "function" then
+        error("Joker calculate must be a function.")
+    end
+
     local mod = NSMDS.CurrentMod
     local joker_id = mod.metadata.id .. "_" .. data.key
 
@@ -113,6 +117,8 @@ function NSMDS.Joker(data)
         blueprint_compat = data.blueprint_compat ~= false,
         eternal_compat = data.eternal_compat ~= false,
         perishable_compat = data.perishable_compat ~= false,
+
+        calculate = data.calculate,
 
         description = data.description or {}
     }

@@ -1,3 +1,4 @@
+
 --[[
     NSMDS - Not SteamModed
     Core / Game Hook
@@ -97,6 +98,8 @@ local function inject_jokers(game)
                     perishable_compat = joker.perishable_compat,
                     eternal_compat = joker.eternal_compat,
 
+                    calculate = joker.calculate,
+
                     rarity = rarity,
                     cost = cost,
 
@@ -115,13 +118,9 @@ local function inject_jokers(game)
                     config = {}
                 }
 
-                -- Registro principal
                 centers[center_key] = center
-
-                -- Pool general de Jokers
                 table.insert(joker_pool, center)
 
-                -- Pool de su rareza
                 table.insert(
                     rarity_pools[rarity],
                     center
@@ -139,7 +138,6 @@ local function inject_jokers(game)
         end
     end
 
-    -- Mantener el orden de los pools
     table.sort(joker_pool, function(a, b)
         return a.order < b.order
     end)
@@ -176,6 +174,51 @@ function GameHook.install()
         return false
     end
 
+    if type(Card) ~= "table" or
+       type(Card.calculate_joker) ~= "function" then
+
+        NSMDS.log_error(
+            "GameHook",
+            "Could not find Card.calculate_joker()."
+        )
+
+        return false
+    end
+
+    -- Hook de las habilidades personalizadas
+    local original_calculate_joker = Card.calculate_joker
+
+    Card.calculate_joker = function(self, context)
+
+        if self.debuff then
+            return nil
+        end
+
+        local result = original_calculate_joker(self, context)
+
+        if result ~= nil then
+            return result
+        end
+
+        local center = self.config and self.config.center
+
+        if type(center) == "table" and
+           type(center.calculate) == "function" then
+
+            if context and context.blueprint and
+               center.blueprint_compat == false then
+                return nil
+            end
+
+            return center.calculate(center, self, context)
+        end
+
+        return result
+    end
+
+    NSMDS.log("Card.calculate_joker() hook installed.")
+
+    -- Hook de inicialización del juego
     local original = Game.init_item_prototypes
 
     Game.init_item_prototypes = function(self, ...)
