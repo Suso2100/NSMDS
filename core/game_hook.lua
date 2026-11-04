@@ -5,6 +5,7 @@
 ]]
 
 local GameHook = {}
+local Atlas = require("core.atlas")
 
 GameHook.installed = false
 
@@ -30,6 +31,7 @@ local function inject_jokers(game)
 
     local registered = NSMDS.Registry.Jokers
     local joker_ids = {}
+    
 
     for id in pairs(registered) do
         table.insert(joker_ids, id)
@@ -105,9 +107,11 @@ local function inject_jokers(game)
 
                     name = joker.name,
 
+                    atlas = joker.atlas or "Joker",
+
                     pos = {
-                        x = 0,
-                        y = 0
+                        x = joker.pos.x,
+                        y = joker.pos.y
                     },
 
                     set = "Joker",
@@ -229,8 +233,13 @@ function GameHook.install()
             "Game.init_item_prototypes() intercepted successfully."
         )
 
-        inject_jokers(self)
+        Atlas.inject(
+            self,
+            NSMDS.Registry.Atlases,
+            NSMDS
+        )
 
+        inject_jokers(self)
     end
 
     GameHook.installed = true

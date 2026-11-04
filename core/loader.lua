@@ -2,7 +2,7 @@
 --[[
     NSMDS - Not SteamModed
     Core / Loader
-    Version: 0.4.0
+    Version: 0.6.0
 ]]
 
 local ModManager = require("core.mod_manager")
@@ -13,7 +13,7 @@ local Atlas = require("core.atlas")
 
 NSMDS = NSMDS or {}
 
-NSMDS.VERSION = "0.2.0"
+NSMDS.VERSION = "0.6.0"
 NSMDS.MOD_DIR = "mods"
 
 -- Mod management
@@ -118,6 +118,7 @@ end
 -- Joker API
 --------------------------------------------------
 
+
 function NSMDS.Joker(data)
 
     if not NSMDS.CurrentMod then
@@ -136,6 +137,26 @@ function NSMDS.Joker(data)
         error("Joker calculate must be a function.")
     end
 
+    if data.atlas ~= nil and
+       (type(data.atlas) ~= "string" or data.atlas == "") then
+        error("Joker atlas must be a valid string.")
+    end
+
+    if data.pos ~= nil then
+
+        if type(data.pos) ~= "table" then
+            error("Joker pos must be a table.")
+        end
+
+        if type(data.pos.x) ~= "number" or
+           type(data.pos.y) ~= "number" or
+           data.pos.x < 0 or data.pos.y < 0 or
+           data.pos.x % 1 ~= 0 or data.pos.y % 1 ~= 0 then
+
+            error("Joker pos requires non-negative integer x and y.")
+        end
+    end
+
     local mod = NSMDS.CurrentMod
 
     if not mod.pending_registry then
@@ -144,11 +165,23 @@ function NSMDS.Joker(data)
 
     local joker_id = mod.metadata.id .. "_" .. data.key
 
-    -- Check global and temporary registries
     if NSMDS.Registry.Jokers[joker_id]
         or mod.pending_registry.Jokers[joker_id] then
 
         error("Duplicate Joker key: " .. joker_id)
+    end
+
+    local atlas_id = nil
+
+    if data.atlas then
+
+        atlas_id = mod.metadata.id .. "_" .. data.atlas
+
+        if not mod.pending_registry.Atlases[atlas_id]
+            and not NSMDS.Registry.Atlases[atlas_id] then
+
+            error("Atlas not registered: " .. atlas_id)
+        end
     end
 
     local joker = {
@@ -167,10 +200,19 @@ function NSMDS.Joker(data)
 
         calculate = data.calculate,
 
-        description = data.description or {}
+        description = data.description or {},
+
+        atlas = atlas_id,
+
+        pos = data.pos and {
+            x = data.pos.x,
+            y = data.pos.y
+        } or {
+            x = 0,
+            y = 0
+        }
     }
 
-    -- Store in the temporary registry
     mod.pending_registry.Jokers[joker_id] = joker
 
     NSMDS.log(
@@ -180,6 +222,7 @@ function NSMDS.Joker(data)
 
     return joker
 end
+
 
 --------------------------------------------------
 -- Joker Registry API
@@ -457,8 +500,28 @@ function NSMDS.load_mod(mod)
         return false
     end
 
+
+    -- Validate and load registered Atlases
+    local atlas_success, atlas_error = Atlas.validate_mod(mod)
+
+    if not atlas_success then
+
+        -- Discard all temporary registrations
+        discard_mod_registry(mod)
+
+        mod.status = "failed"
+        mod.error = atlas_error
+
+        table.insert(NSMDS.Failed, mod)
+
+        NSMDS.log_error(mod.name, atlas_error)
+
+        return false
+    end
+
     -- Commit temporary registrations
     commit_mod_registry(mod)
+
 
     -- Register successfully loaded mod
     NSMDS.Registry.Mods[mod.metadata.id] = mod
