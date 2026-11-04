@@ -6,6 +6,7 @@
 ]]
 
 local ModManager = require("core.mod_manager")
+local GameHook = require("core.game_hook")
 local UIHook = require("core.ui_hook")
 local json = require("core.json")
 
@@ -103,9 +104,16 @@ function NSMDS.Joker(data)
         key = data.key,
         id = joker_id,
         mod_id = mod.metadata.id,
+
         name = data.name or data.key,
+
         rarity = data.rarity or 1,
         cost = data.cost or 4,
+
+        blueprint_compat = data.blueprint_compat ~= false,
+        eternal_compat = data.eternal_compat ~= false,
+        perishable_compat = data.perishable_compat ~= false,
+
         description = data.description or {}
     }
 
@@ -427,6 +435,7 @@ function NSMDS.load_mods()
 
     -- Install NSMDS UI hooks
     UIHook.install()
+    GameHook.install()
 
     return true
 end
